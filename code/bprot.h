@@ -8,104 +8,173 @@ extern "C" {
 /*
 二进制通讯协议接口参考文档。
 为避免变量和宏冲突，采用模块前缀的模块管理方式。
-BPK: bprot development kit
+BP: binary protocol
 */
 
-#define BPK_MAX_DEV_ID_VAL_BYTE_LEN 4 // ID中的值的长度
-#define BPK_MAX_DEV_ID_BYTE_LEN 8
-#define BPK_MAX_PHONE_NUM_LEN 16
-#define BPK_MAX_USER_COUNT 4
-#define BPK_MAX_MSG_CMD_LEN 32
-#define BPK_MAX_MSG_RSP_LEN 128
-#define BPK_MAX_DOMAIN_LEN 32
-#define BPK_MAX_IP_ADDR_LEN 4
-#define BPK_MAX_SMS_CONTENT_LEN 140
-#define BPK_MAX_FENCE_NUM 4
-#define BPK_MAX_APN_NAME_LEN 32
-#define BPK_MAX_APN_USER_NAME_LEN 32
-#define BPK_MAX_APN_PWD_LEN 16
-#define BPK_MAX_APN_USER_DATA_LEN 32
-#define BPK_MAX_VER_STR_LEN 16
-#define BPK_MAX_CHECK_NUM 48
-#define BPK_MAX_DATETIME_BYTE_LEN 6
-#define BPK_MAX_TIME_BYTE_LEN 3
-#define BPK_MAX_LAT_LNG_STR_LEN 11
-#define BPK_MAX_LOGIN_PACKET_LEN 32
-#define BPK_MAX_BIG_LIVESTOCK_NUM_IN_1_PAC 16 // 512字节下的最大的小羊的个数
-#define BPK_MAX_LAMB_NUM_IN_1_PAC 32          // 512字节下的最大的小羊的个数
-#define BPK_MAX_LAMB_NUM 2000
-#define BPK_MAX_CFG_SVR_NUM 3             // 默认最多配置3组服务器
-#define BPK_MAX_UPLOAD_TIME_NUM 10        // 上传时的时间点序列的规格，最多10个点
-#define BPK_MAX_BIG_LIVESTOCK_LOC_NUM 480 // 一次上报之间缓存的GPS位置的个数
-
-#define BPK_MAX_SCAN_AP_NUM 9
-#define BPK_MAX_MAC_BYTE_LEN 6
-#define BPK_MAX_SSID_LEN 16
-
-#define BPK_MAX_GPS_LOC_NUM ((256 - sizeof(bpk_msg_head_struct) - 2 - 2) / sizeof(bpk_gps_struct))
-
-#define PACK_START 0xFFFF
-#define PACK_END 0xEEEE
+#define BP_DEVICE_ID_BYTE_LEN 8
+#define BP_DATETIME_BYTE_LEN 6
+#define BP_GPS_LOC_NUM 10
+#define BP_WIFI_LOC_NUM 4
+#define BP_CELL_LOC_NUM 4
+#define BP_PACK_START 0xFFFF
+#define BP_PACK_END 0xEEEE
+#define BP_ENC_RES_LEN 32 // 加密结果
+#define BP_RET_DESC_LEN 32
+#define BP_MAC_BYTE_LEN 6
+#define BP_SSID_LEN 32
+#define BP_ICCID_STR_LEN 20
+#define BP_IMSI_STR_LEN 15
+#define BP_IMEI_STR_LEN 15
 
 // 字段偏移宏
-#define PACK_START_OFFSET 0
-#define PACK_CRC_OFFSET (PACK_START_OFFSET + sizeof(U16))
-#define PACK_LEN_OFFSET (PACK_CRC_OFFSET + sizeof(U16))
-#define PACK_TYPE_OFFSET (PACK_LEN_OFFSET + sizeof(U16))
-#define PACK_VER_OFFSET (PACK_TYPE_OFFSET + sizeof(U8))
-#define PACK_SN_OFFSET (PACK_VER_OFFSET + sizeof(U8))
-#define PACK_DATETIME_OFFSET (PACK_SN_OFFSET + sizeof(U32))
-#define PACK_CRC_EXCLUDE_LEN 6
-#define PACK_HEAD_LEN sizeof(BPK_msg_head_struct)
-#define PACK_ACK_LEN (PACK_HEAD_LEN + 2)
+///////////////////////////////////////////
+#define BP_PACK_START_OFFSET 0
+#define BP_PACK_CRC_OFFSET (BP_PACK_START_OFFSET + 2)
+#define BP_PACK_LEN_OFFSET (BP_PACK_CRC_OFFSET + 2)
+#define BP_PACK_SN_OFFSET (BP_PACK_LEN_OFFSET + 2)
+#define BP_PACK_DATETIME_OFFSET (PACK_SN_OFFSET + 4)
+#define BP_PACK_FROM_UID_OFFSET (BP_PACK_DATETIME_OFFSET + 6)
+#define BP_PACK_FROM_DID_OFFSET (BP_PACK_FROM_UID_OFFSET + 4)
+#define BP_PACK_TO_UID_OFFSET (BP_PACK_FROM_DID_OFFSET + 8)
+#define BP_PACK_TO_DID_OFFSET (BP_PACK_TO_UID_OFFSET + 4)
+#define BP_PACK_CONTENT_START_OFFSET (BP_PACK_TO_DID_OFFSET + 8)
 
+#define BP_PACK_CRC_EXCLUDE_LEN 6 //校验时总包需要排除的长度。起始+结尾+校验
+#define BP_PACK_HEAD_LEN sizeof(bp_msg_head_struct)
+/////////////////////////////////
+// data type, 2 byte
 typedef enum {
-  EN_ATP_IP,
-  EN_ATP_DOMAIN,
-} ADDR_TYPE;
+  EN_DT_RSP = 10,       // 响应节点
+  EN_DT_LOGIN = 20,     // 登录信息
+  EN_DT_POWER = 30,     // 电量
+  EN_DT_PRESSURE = 40,  // 气压
+  EN_DT_TEMP_HUMI = 50, // 温湿度
+  EN_DT_GPS = 60,
+  EN_DT_WIFI = 70,
+  EN_DT_CELL = 80,
 
-typedef enum {
-  EN_CFG_TYPE_SERVER = 1,
-  EN_CFG_TYPE_BIG_LIVESTICK = 2,
-  EN_CFG_TYPE_LAMB_GW = 3,
-} CFG_DATA_TYPE;
-
-typedef enum {
-  EN_PACK_TYPE_ECHO = 0,
-  EN_PT_BEACON_STATE = 0x01,
-  EN_PT_BEACON_LOC = 0x03,
-  EN_PT_PLAY_VOICE = 0x05,
-  EN_PT_AP_SCAN = 0x07,
-  EN_PT_OTA = 0x09,
-  EN_PT_WIFI_VER = 0x0B,
-  EN_PT_ACK = 0xFF
-} PACK_TYPE_EN;
+  EN_DT_ENCRYPT = 65500,
+} DATA_TYPE_EN;
 
 #pragma pack(1)
-
 typedef struct {
   uint16_t start;
   uint16_t crc;
-  uint16_t pack_len;
-  uint16_t pack_type;
+  uint16_t len;
   uint32_t sn;
-  uint8_t send_id[8];
-  uint8_t datetime[BPK_MAX_DATETIME_BYTE_LEN];
-} bpk_msg_head_struct;
+  uint8_t datetime[BP_DATETIME_BYTE_LEN];
+  uint32_t from_uid;
+  uint8_t from_did[BP_DEVICE_ID_BYTE_LEN];
+  uint32_t to_uid;
+  uint8_t to_did[BP_DEVICE_ID_BYTE_LEN];
+} bp_msg_head_struct;
+
+typedef struct {
+  uint16_t end;
+} bp_msg_tail_struct;
+/////////////////////////
+// 回复响应
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint16_t ret_code;              // respons code
+  char ret_desc[BP_RET_DESC_LEN]; //实际长度以0为截至，不超过最大规格
+} respons_struct;
+
+// 加密
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint8_t key_type;                  // key 类型，md5,sha1,sha2等
+  uint8_t key_index;                 // 在平台创建的key索引，跟用户id有关
+  uint16_t enc_data[BP_ENC_RES_LEN]; // 最终加密的结果
+} encrypt_struct;
+
+// 登录包
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint8_t device_id[BP_DEVICE_ID_BYTE_LEN];
+  uint8_t iccid[BP_ICCID_STR_LEN]; //898604481618C0688019
+  uint8_t imsi[BP_IMSI_STR_LEN];   //460046807308019
+  uint8_t imei[BP_IMEI_STR_LEN];
+  uint8_t mac[BP_MAC_BYTE_LEN];
+  uint8_t sw_ver;
+  uint8_t hw_ver;
+} login_struct;
+
+// 电量
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint8_t power; // 剩余电量
+  uint16_t volt; // 电压
+} power_struct;
+
+// 气压
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint16_t air_presure;
+} bp_comm_struct;
+
+// 温湿度
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  int16_t temp;
+  uint8_t humi; //湿度
+} temp_humi_struct;
 
 // GPS包
 typedef struct {
-  uint8_t sat_num;
-  uint8_t loc_prop;
-  uint32_t lat;
-  uint32_t lng;
-  uint16_t speed;
-} bpk_gps_struct;
+  uint8_t fix_num;
+  float lat;
+  float lng;
+  uint32_t speed;
+} gps_node_struct;
 
 typedef struct {
-  uint8_t loc_num;
-  bpk_gps_struct gps[BPK_MAX_GPS_LOC_NUM];
-} bpk_gps_req_struct;
+  uint16_t type;
+  uint16_t len;
+  uint8_t gps_num;
+  gps_node_struct gps_list[BP_GPS_LOC_NUM];
+} gps_info_struct;
+
+// wifi
+typedef struct {
+  uint8_t mac[BP_MAC_BYTE_LEN];
+  int16_t sig_stren;
+  uint8_t ssid[BP_SSID_LEN];
+} wifi_node_struct;
+
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint8_t wifi_num;
+  wifi_node_struct wifi_list[BP_WIFI_LOC_NUM];
+} wifi_info_struct;
+
+// lbs
+typedef struct {
+  uint16_t mcc;
+  uint8_t mnc;
+  uint16_t lac;
+  uint32_t cellid;
+  //------------
+  uint16_t sid;
+  uint16_t nid;
+  uint16_t bid;
+  int16_t signal; //信号强度
+} cell_node_struct;
+
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint8_t cell_type; // 基站类型:0 移动 1 联通 2 电信
+  uint8_t cell_num;
+  cell_node_struct cell_list[BP_CELL_LOC_NUM];
+} cell_info_struct;
 
 #pragma pack()
 

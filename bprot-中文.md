@@ -1,195 +1,217 @@
 # 目标
-此文档旨在建议一种简单，高效，可扩展的使用于硬件和服务器之间的二进制协议。
+此文档旨在建议一种简单，高效，可扩展的使用于硬件和服务器之间的二进制协议。此协议可以直接在tcp层面运用，也可以作为MQTT的用户数据结构的设计参考。
 
-# 协议包结构
+# 协议框架结构
+请求和响应都是使用相同的包结构，只是内容体不一样而已。
 
-请求消息：
+## 协议结构
 
-| 字段     | 起始符 | 校验 | 内容长度 | 消息类型  | 请求序列好 | 时间   | 发送方ID | 消息内容 | 结束符  | 
-| ----    | -----  | ----| ----    | ----      | ----        | ----  | ----    | ----    | ----   |
-| 字节长度 | 2      | 2   | 2       | 2         | 4           | 6     | 8       | N       | 2      |
+| 字段     | 起始符 | 校验 | 长度 | 序列号  | 时间 | 发送客户ID | 发送设备ID |接收客户ID  | 接收客户ID| 消息内容0 |消息内容1 | 结束符  | 
+| ----    | -----  | ----| ---- | ----   | ---- | ----      | ----      |----       |----      | ----     |----     | ----   |
+| 字节长度 | 2      | 2   | 2    | 4      | 6    | 4         | 8         |4          |8         | N0       |N1       | 2      |
 
-响应消息：
-
-同请求消息格式，只是内容不一样而已。通用响应内容：
-
-```
-uint32_t ret_code; //响应码
-uint32_t cfg_verno;//配置版本号，可选
-
-```
 
 1.	起始符：0xFFFF
-2.	校验：从长度到内容结束，不包含结束符。采用crc16校验算法
-3.	长度：内容的长度
-4.	消息类型：消息类型，建议0x0101，高字节主类型，低字节子类型，支持一类消息下的，细微调整和变更
-6.	请求序列号（SN）：请求方开机从0开始，递增。响应方将请求消息的序列号原样返回。
-7.	时间：年月日时分秒 ，6个字节
-8.	消息内容：每个消息类型有自己独立的数据内容，见下面的消息结构
-9.	结束符：0xEEEE
+2.	校验：从长度到内容结束的校验，不包含结束符。crc16校验
+3.	长度：从起始到结束的总长度
+4.	序列号（SN）：发送方的序列号，开机后自增
+5.	时间：年月日时分秒 ，6个字节，或者uint32类型的utc时间戳（高两位为0）
+6.	发送客户ID：注册平台时，得到的用户id，全平台唯一。
+7.	发送设备ID：设备id，由设备商自定义。
+8.	接收客户ID：注册平台时，得到的用户id，全平台唯一。
+9.	接收设备ID：设备id由设备商自定义。
+10.	消息内容：每个消息类型有自己独立的数据内容，见下面的消息结构
+11.	结束符：0xEEEE
+
+# 内容节点数据结构
+每个内容节点都是相同的结构
+
+| 字段     | 节点类型 | 节点长度 | 节点内容 |
+| ----    | -----   | ----     | ---- |
+| 字节长度 | 2       | 2        | N    |
 
 # 约定
 
-1.	响应消息的消息类型=请求消息的消息类型+0x10000000
-2.	每个数据包需要携带发送方的UID（unique ID），对于硬件UID可以是IMEI，MAC，生产序列号等。对于服务器，UID建议用IP（byte数组）
-3.	响应中的sn是将请求中的sn原样返回。
-4.	时间为发送方本地RTC时钟，如果本地没有RTC，可以留空
-5.	每一种消息，发送方既可以是终端，也可以是服务器，只能通过消息中的UID判断。也就是说一种消息，既可以是设备请求服务器，也可以是服务器请求设备，只要双方遵循此协议就可以。
-6.	在混合位置包消息中，位置数据出现的顺序GPS>WIFI>基站
-7.	为了保证数据效率，在转化成字节流时，只转化有效的内容，避免用数组最大规格。
+1.	加密节点内容在最后一个位置，标识前面所有内容的总加密结果。
+2.	设备ID，对于硬件可以是IMEI，MAC，生产序列号等。对于服务器，建议用IP（byte数组）
+3.	所有数据事件都使用UTC事件。
+4.	每一种消息，发送方既可以是终端，也可以是服务器，只能通过消息中的UID判断。也就是说一种消息，既可以是设备请求服务器，也可以是服务器请求设备，只要双方遵循此协议就可以。
 
-# 数据类型规格
+# 常用规格定义
+```
+#define BP_DEVICE_ID_BYTE_LEN 8
+#define BP_DATETIME_BYTE_LEN 6
+#define BP_GPS_LOC_NUM 10
+#define BP_WIFI_LOC_NUM 4
+#define BP_CELL_LOC_NUM 4
+#define BP_PACK_START 0xFFFF
+#define BP_PACK_END 0xEEEE
+#define BP_ENC_RES_LEN 32 // 加密结果
+#define BP_RET_DESC_LEN 32
+#define BP_MAC_BYTE_LEN 6
+#define BP_SSID_LEN 32
+#define BP_ICCID_STR_LEN 20
+#define BP_IMSI_STR_LEN 15
+#define BP_IMEI_STR_LEN 15
 
-我们对常用的数据类型做规格定义，统一类型长度。
+// 字段偏移宏
+///////////////////////////////////////////
+#define BP_PACK_START_OFFSET 0
+#define BP_PACK_CRC_OFFSET (BP_PACK_START_OFFSET + 2)
+#define BP_PACK_LEN_OFFSET (BP_PACK_CRC_OFFSET + 2)
+#define BP_PACK_SN_OFFSET (BP_PACK_LEN_OFFSET + 2)
+#define BP_PACK_DATETIME_OFFSET (PACK_SN_OFFSET + 4)
+#define BP_PACK_FROM_UID_OFFSET (BP_PACK_DATETIME_OFFSET + 6)
+#define BP_PACK_FROM_DID_OFFSET (BP_PACK_FROM_UID_OFFSET + 4)
+#define BP_PACK_TO_UID_OFFSET (BP_PACK_FROM_DID_OFFSET + 8)
+#define BP_PACK_TO_DID_OFFSET (BP_PACK_TO_UID_OFFSET + 4)
+#define BP_PACK_CONTENT_START_OFFSET (BP_PACK_TO_DID_OFFSET + 8)
 
+#define BP_PACK_CRC_EXCLUDE_LEN 6 //校验时总包需要排除的长度。起始+结尾+校验
+#define BP_PACK_HEAD_LEN sizeof(bp_msg_head_struct)
+```
+# 枚举定义
+```
+// data type, 2 byte
+typedef enum {
+  EN_DT_RSP = 10,       // 响应节点
+  EN_DT_LOGIN = 20,     // 登录信息
+  EN_DT_POWER = 30,     // 电量
+  EN_DT_PRESSURE = 40,  // 气压
+  EN_DT_TEMP_HUMI = 50, // 温湿度
+  EN_DT_GPS = 60,
+  EN_DT_WIFI = 70,
+  EN_DT_CELL = 80,
 
-# 消息类型
-
-|消息类型  |    主值   | 说明               |  
-| ----    | ------    | ----     | 
-|  注册包   |  0x0101     |  none    |  
-|  登录包   |  0x0201     |  none    | 
-|  心跳包   |  0x0301     |  none    | 
-|  gps位置   |  0x0401     |  none    | 
-|  wifi位置   |  0x0402     |  none    | 
-|  lbs位置   |  0x0404     |  none    | 
-|  wifi+lbs   |  0x0406     |  子类型是与的逻辑    | 
-|  配置请求   |  0x0501     |  none    | 
-
-# 消息内容
-
-因为消息类型的结构多样化，markdown不支持复杂表格，所以消息内容的字节结构将通过c语言风格的结构体定义来说明。
-
-## 注册包 0x0101
-## 登录包 0x0201
-## 心跳包 0x0301
-
-## 位置包
-我们的位置包含GPS，wifi，lbs三类位置数据，每个位置类型都是可选的，至少包含一种，最多3种。
-
-|GPS信息  | wifi信息   | lbs信息 |  
-| ----   | ------    | ----     | 
-|  可选   |  可选     |  可选    |  
-
-### GPS包 0x0401
-#### 请求结构 0x0401
-
+  EN_DT_ENCRYPT = 65500,
+} DATA_TYPE_EN;
+```
+# 常用数据结构
 ```
 typedef struct {
-  uint8_t sat_num;
-  uint8_t loc_prop;
-  uint32_t lat;
-  uint32_t lng;
-  uint16_t speed;
-} bp_gps_struct;
+  uint16_t start;
+  uint16_t crc;
+  uint16_t len;
+  uint32_t sn;
+  uint8_t datetime[BP_DATETIME_BYTE_LEN];
+  uint32_t from_uid;
+  uint8_t from_did[BP_DEVICE_ID_BYTE_LEN];
+  uint32_t to_uid;
+  uint8_t to_did[BP_DEVICE_ID_BYTE_LEN];
+} bp_msg_head_struct;
 
 typedef struct {
-  uint8_t loc_num;
-  bp_gps_struct gps[BPK_MAX_GPS_LOC_NUM];
-} bp_gps_req_struct;
-```
-字段说明：
-
-loc_num：位置包的个数，支持多包传输。
-
-sat_num：当前包中的定位结果的有效gps数。
-
-loc_prop：位置属性，通过bit表示：
-
-| 7     | 6    |   5 |    4 |    3 | 2    |1     | 0    |  
-| ----  | -    | ----| ---- | ---- | ---- | ---- | ---- | 
-|   NC  |  NC  |  NC |  NC  |见描述 |见描述 |东/西 |南/北  | 
-
-0bit:  0  南纬 1 北纬
-
-1bit:  0  西经 1东经 
-
-3:2bit： 
-
-00：实时 
-
-01：差分 
-
-10：估算 
-
-11：无效 
-
-如果是实时、差分或者估算，说明gps已经成功定位。 
-
-lat：纬度的 uint 表示值。纬度值为度分的整数表示 ddmm.mmmm×10000。实际数值为上报数据除以10000 ，得到纬度的度分表示法。
-
-lng：经度度的 uint 表示值，转换方法同纬度。 
-
-speed：单位 km/h，上报上来的是乘以100以后的整数值, 除以100得到实际值。 
-
-#### 响应结构 0x8401
-
-```
-uint32_t ret_code; //响应码
-uint32_t cfg_verno;//配置版本号，可选
-
-```
-
-响应内容最大支持4字节uint型：
-
-0x00: 成功
-
-0x01：格式错误
-0x02：校验错误
-
-...
-0x10000001:服务器错误，除了定义的设备错误，其他都是服务器错误。这里可以直接返回服务器的错误码。
-
-#### 数据样例
-
-none
-### WIFI包 0x0402
-#### 请求结构
-
-```
+  uint16_t end;
+} bp_msg_tail_struct;
+/////////////////////////
+// 回复响应
 typedef struct {
-  int8_t ssid[BP_MAX_SSID_LEN];
-  uint8_t mac[BP_MAX_MAC_BYTE_LEN];
-  int16_t strength;
-} bp_ap_info_struct;
+  uint16_t type;
+  uint16_t len;
+  uint16_t ret_code;              // respons code
+  char ret_desc[BP_RET_DESC_LEN]; //实际长度以0为截至，不超过最大规格
+} respons_struct;
+
+// 加密
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint8_t key_type;                  // key 类型，md5,sha1,sha2等
+  uint8_t key_index;                 // 在平台创建的key索引，跟用户id有关
+  uint16_t enc_data[BP_ENC_RES_LEN]; // 最终加密的结果
+} encrypt_struct;
+
+// 登录包
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint8_t device_id[BP_DEVICE_ID_BYTE_LEN];
+  uint8_t iccid[BP_ICCID_STR_LEN]; //898604481618C0688019
+  uint8_t imsi[BP_IMSI_STR_LEN];   //460046807308019
+  uint8_t imei[BP_IMEI_STR_LEN];
+  uint8_t mac[BP_MAC_BYTE_LEN];
+  uint8_t sw_ver;
+  uint8_t hw_ver;
+} login_struct;
+
+// 电量
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint8_t power; // 剩余电量
+  uint16_t volt; // 电压
+} power_struct;
+
+// 气压
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  uint16_t air_presure;
+} bp_comm_struct;
+
+// 温湿度
+typedef struct {
+  uint16_t type;
+  uint16_t len;
+  int16_t temp;
+  uint8_t humi; //湿度
+} temp_humi_struct;
+
+// GPS包
+typedef struct {
+  uint8_t fix_num;
+  float lat;
+  float lng;
+  uint32_t speed;
+} gps_node_struct;
 
 typedef struct {
-  uint8_t ap_num;
-  bp_ap_info_struct ap_list[BP_MAX_SCAN_AP_NUM];
-} bp_wifi_req_struct;
-```
-#### 响应结构
-#### 数据样例
+  uint16_t type;
+  uint16_t len;
+  uint8_t gps_num;
+  gps_node_struct gps_list[BP_GPS_LOC_NUM];
+} gps_info_struct;
 
-none
-### 基站包 0x0404
-#### 请求结构
-
-```
+// wifi
 typedef struct {
-  int8_t cell_str[20]; // 基站mcc mnc那些基站串，用逗号连接，含结束符
-  int16_t strength;
-} bp_cell_info_struct;
+  uint8_t mac[BP_MAC_BYTE_LEN];
+  int16_t sig_stren;
+  uint8_t ssid[BP_SSID_LEN];
+} wifi_node_struct;
 
 typedef struct {
-  uint8_t cell_num;
+  uint16_t type;
+  uint16_t len;
+  uint8_t wifi_num;
+  wifi_node_struct wifi_list[BP_WIFI_LOC_NUM];
+} wifi_info_struct;
+
+// lbs
+typedef struct {
+  uint16_t mcc;
+  uint8_t mnc;
+  uint16_t lac;
+  uint32_t cellid;
+  //------------
+  uint16_t sid;
+  uint16_t nid;
+  uint16_t bid;
+  int16_t signal; //信号强度
+} cell_node_struct;
+
+typedef struct {
+  uint16_t type;
+  uint16_t len;
   uint8_t cell_type; // 基站类型:0 移动 1 联通 2 电信
-  bp_cell_info_struct cell_list[BP_MAX_CELL_NUM];
-} bp_cell_req_struct;
+  uint8_t cell_num;
+  cell_node_struct cell_list[BP_CELL_LOC_NUM];
+} cell_info_struct;
 ```
 
-#### 响应结构
-#### 数据样例
 
-none
+# 用户数据包
+以上是原子数据定义，真正用户做业务时，可以根据硬件功能的实际需要对多种数据进行组合，例如：
 
-## 配置请求 0x0501
-### 请求结构
-
-null
-### 响应结构
-
-待定
-### 数据样例
-
-none
+|电量            | 温湿度           | 位置                               | 
+| ----          | ------           | ------                            | 
+| power_struct  |  temp_humi_struct| wifi_info_struct+cell_info_struct |
