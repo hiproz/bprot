@@ -215,6 +215,3 @@ typedef struct {
 |电量            | 温湿度           | 位置                               | 
 | ----          | ------           | ------                            | 
 | power_struct  |  temp_humi_struct| wifi_info_struct+cell_info_struct |
-
-# 英文版
-[BProt english version](https://github.com/hiproz/bprot/blob/master/bprot-en.md)
