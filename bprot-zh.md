@@ -6,14 +6,14 @@
 
 ## 协议结构
 
-| 字段     | 起始符 | 校验 | 长度 | 序列号  | 时间 | 发送客户ID | 发送设备ID |接收客户ID  | 接收客户ID| 消息内容0 |消息内容1 | 结束符  | 
+| 字段     | 起始符 | 长度 | 校验 | 序列号  | 时间 | 发送客户ID | 发送设备ID |接收客户ID  | 接收客户ID| 消息内容0 |消息内容1 | 结束符  | 
 | ----    | -----  | ----| ---- | ----   | ---- | ----      | ----      |----       |----      | ----     |----     | ----   |
 | 字节长度 | 2      | 2   | 2    | 4      | 6    | 4         | 8         |4          |8         | N0       |N1       | 2      |
 
 
 1.	起始符：0xFFFF
-2.	校验：从长度到内容结束的校验，不包含结束符。crc16校验
-3.	长度：从起始到结束的总长度
+2.	长度：从校验到内容结束的总长度
+3.	校验：从序列号到内容结束的校验，不包含结束符。crc16校验
 4.	序列号（SN）：发送方的序列号，开机后自增
 5.	时间：年月日时分秒 ，6个字节，或者uint32类型的utc时间戳（高两位为0）
 6.	发送客户ID：注册平台时，得到的用户id，全平台唯一。
@@ -26,9 +26,11 @@
 # 内容节点数据结构
 每个内容节点都是相同的结构
 
-| 字段     | 节点类型 | 节点长度 | 节点内容 |
+| 字段     | 数据长度 | 数据类型 | 数据内容 |
 | ----    | -----   | ----     | ---- |
 | 字节长度 | 2       | 2        | N    |
+
+1. 长度：包含类型和内容的总长度
 
 # 约定
 
@@ -90,8 +92,8 @@ typedef enum {
 ```
 typedef struct {
   uint16_t start;
-  uint16_t crc;
   uint16_t len;
+  uint16_t crc;
   uint32_t sn;
   uint8_t datetime[BP_DATETIME_BYTE_LEN];
   uint32_t from_uid;
@@ -106,16 +108,16 @@ typedef struct {
 /////////////////////////
 // 回复响应
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint16_t ret_code;              // respons code
   char ret_desc[BP_RET_DESC_LEN]; //实际长度以0为截至，不超过最大规格
 } respons_struct;
 
 // 加密
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t key_type;                  // key 类型，md5,sha1,sha2等
   uint8_t key_index;                 // 在平台创建的key索引，跟用户id有关
   uint16_t enc_data[BP_ENC_RES_LEN]; // 最终加密的结果
@@ -123,8 +125,8 @@ typedef struct {
 
 // 登录包
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t device_id[BP_DEVICE_ID_BYTE_LEN];
   uint8_t iccid[BP_ICCID_STR_LEN]; //898604481618C0688019
   uint8_t imsi[BP_IMSI_STR_LEN];   //460046807308019
@@ -136,23 +138,23 @@ typedef struct {
 
 // 电量
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t power; // 剩余电量
   uint16_t volt; // 电压
 } power_struct;
 
 // 气压
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint16_t air_presure;
 } bp_comm_struct;
 
 // 温湿度
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   int16_t temp;
   uint8_t humi; //湿度
 } temp_humi_struct;
@@ -166,8 +168,8 @@ typedef struct {
 } gps_node_struct;
 
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t gps_num;
   gps_node_struct gps_list[BP_GPS_LOC_NUM];
 } gps_info_struct;
@@ -180,8 +182,8 @@ typedef struct {
 } wifi_node_struct;
 
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t wifi_num;
   wifi_node_struct wifi_list[BP_WIFI_LOC_NUM];
 } wifi_info_struct;
@@ -200,8 +202,8 @@ typedef struct {
 } cell_node_struct;
 
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t cell_type; // 基站类型:0 移动 1 联通 2 电信
   uint8_t cell_num;
   cell_node_struct cell_list[BP_CELL_LOC_NUM];
