@@ -59,8 +59,8 @@ typedef enum {
 #pragma pack(1)
 typedef struct {
   uint16_t start;
-  uint16_t crc;
   uint16_t len;
+  uint16_t crc;
   uint32_t sn;
   uint8_t datetime[BP_DATETIME_BYTE_LEN];
   uint32_t from_uid;
@@ -75,16 +75,16 @@ typedef struct {
 /////////////////////////
 // 回复响应
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint16_t ret_code;              // respons code
   char ret_desc[BP_RET_DESC_LEN]; //实际长度以0为截至，不超过最大规格
 } respons_struct;
 
 // 加密
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t key_type;                  // key 类型，md5,sha1,sha2等
   uint8_t key_index;                 // 在平台创建的key索引，跟用户id有关
   uint16_t enc_data[BP_ENC_RES_LEN]; // 最终加密的结果
@@ -92,8 +92,8 @@ typedef struct {
 
 // 登录包
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t device_id[BP_DEVICE_ID_BYTE_LEN];
   uint8_t iccid[BP_ICCID_STR_LEN]; //898604481618C0688019
   uint8_t imsi[BP_IMSI_STR_LEN];   //460046807308019
@@ -105,23 +105,23 @@ typedef struct {
 
 // 电量
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t power; // 剩余电量
   uint16_t volt; // 电压
 } power_struct;
 
 // 气压
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint16_t air_presure;
 } bp_comm_struct;
 
 // 温湿度
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   int16_t temp;
   uint8_t humi; //湿度
 } temp_humi_struct;
@@ -135,8 +135,8 @@ typedef struct {
 } gps_node_struct;
 
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t gps_num;
   gps_node_struct gps_list[BP_GPS_LOC_NUM];
 } gps_info_struct;
@@ -149,8 +149,8 @@ typedef struct {
 } wifi_node_struct;
 
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t wifi_num;
   wifi_node_struct wifi_list[BP_WIFI_LOC_NUM];
 } wifi_info_struct;
@@ -169,8 +169,8 @@ typedef struct {
 } cell_node_struct;
 
 typedef struct {
-  uint16_t type;
   uint16_t len;
+  uint16_t type;
   uint8_t cell_type; // 基站类型:0 移动 1 联通 2 电信
   uint8_t cell_num;
   cell_node_struct cell_list[BP_CELL_LOC_NUM];
